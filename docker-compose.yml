@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Servicio de Redis (Broker de mensajes y backend de resultados)
+  redis:
+    image: redis:alpine
+    container_name: saas_redis
+    ports:
+      - "6379:6379"
+
+  # Servicio principal de Django (Web)
+  web:
+    build: .
+    container_name: saas_django
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  # Servicio del Worker de Celery (Procesamiento en segundo plano)
+  celery:
+    build: .
+    container_name: saas_celery
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
